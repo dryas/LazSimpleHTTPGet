@@ -1,1 +1,1 @@
-# LazSimpleHTTPGet
+# LazSimpleHTTPsGet
