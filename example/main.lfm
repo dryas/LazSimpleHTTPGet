@@ -1,0 +1,96 @@
+object MainForm: TMainForm
+  Left = 350
+  Height = 269
+  Top = 250
+  Width = 517
+  BorderStyle = bsSingle
+  Caption = 'LazSimpleHTTPsGet'
+  ClientHeight = 269
+  ClientWidth = 517
+  OnDestroy = FormDestroy
+  object GroupBox1: TGroupBox
+    Left = 8
+    Height = 256
+    Top = 8
+    Width = 504
+    Caption = 'Download File Example'
+    ClientHeight = 236
+    ClientWidth = 500
+    TabOrder = 0
+    object DownloadProgressLabel: TLabel
+      Left = 112
+      Height = 15
+      Top = 80
+      Width = 15
+      Caption = '-/-'
+    end
+    object ProgressBar: TProgressBar
+      Left = 112
+      Height = 16
+      Top = 49
+      Width = 374
+      TabOrder = 0
+    end
+    object StatusInfoMemo: TMemo
+      Left = 112
+      Height = 64
+      Top = 112
+      Width = 374
+      ReadOnly = True
+      ScrollBars = ssVertical
+      TabOrder = 1
+    end
+    object DownloadBtn: TButton
+      Left = 112
+      Height = 33
+      Top = 192
+      Width = 184
+      Caption = 'Start Download'
+      TabOrder = 2
+      OnClick = DownloadBtnClick
+    end
+    object URLEdit: TEdit
+      Left = 112
+      Height = 23
+      Top = 16
+      Width = 374
+      TabOrder = 3
+      Text = 'https://mirror.faigner.de/tdf/libreoffice/stable/24.8.3/win/x86_64/LibreOffice_24.8.3_Win_x86-64.msi'
+    end
+    object UrlStaticLabel: TLabel
+      Left = 8
+      Height = 15
+      Top = 16
+      Width = 24
+      Caption = 'URL:'
+    end
+    object TransferStaticLabel: TLabel
+      Left = 8
+      Height = 15
+      Top = 80
+      Width = 44
+      Caption = 'Transfer:'
+    end
+    object ProgressStaticLabel: TLabel
+      Left = 8
+      Height = 15
+      Top = 49
+      Width = 48
+      Caption = 'Progress:'
+    end
+    object StopBtn: TButton
+      Left = 302
+      Height = 33
+      Top = 192
+      Width = 184
+      Caption = 'Stop Download'
+      Enabled = False
+      TabOrder = 4
+      OnClick = StopBtnClick
+    end
+  end
+  object SaveDialog: TSaveDialog
+    Left = 40
+    Top = 184
+  end
+end
