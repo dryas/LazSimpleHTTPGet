@@ -55,7 +55,6 @@ object MainForm: TMainForm
       Top = 16
       Width = 374
       TabOrder = 3
-      Text = 'https://mirror.faigner.de/tdf/libreoffice/stable/24.8.3/win/x86_64/LibreOffice_24.8.3_Win_x86-64.msi'
     end
     object UrlStaticLabel: TLabel
       Left = 8
