@@ -2,7 +2,7 @@
 
 ![Example Application](https://github.com/dryas/LazSimpleHTTPsGet/blob/main/doc/example_screenshot.png)
 
-LazSimpleHTTPsGet is a simple asynchronous (threads) file download Unit with progress indicator for Lazarus/Free Pascal. It supports downloads from HTTP and HTTPS sources and the developer can choose if he wants to use Ararat Synapse or FCL/TFPHttpClient in the background. That said it supports OpenSSLv1 and OpenSSLv3.
+LazSimpleHTTPsGet is a simple asynchronous (threads) file download and content fetch (e.g. website source, JSON, XML etc.) Unit with progress indicator for Lazarus/Free Pascal. It supports downloads from HTTP and HTTPS sources and the developer can choose if he wants to use Ararat Synapse or FCL/TFPHttpClient in the background. That said it supports OpenSSLv1 and OpenSSLv3.
 
 The Unit has been tested with Windows but should also work on other Systems which are supported by FCL/TFPHttpClient or Synapse (Linux, Mac etc.).
 

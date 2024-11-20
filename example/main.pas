@@ -41,6 +41,7 @@ type
   { TMainForm }
 
   TMainForm = class(TForm)
+    FetchBtn: TButton;
     StopBtn: TButton;
     DownloadBtn: TButton;
     DownloadProgressLabel: TLabel;
@@ -52,11 +53,12 @@ type
     ProgressStaticLabel: TLabel;
     URLEdit: TEdit;
     UrlStaticLabel: TLabel;
+    procedure FetchBtnClick(Sender: TObject);
     procedure StopBtnClick(Sender: TObject);
     procedure DownloadBtnClick(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure UpdateProgress(ALen, APos: Int64; AHRLen, AHRPos: String);
-    procedure UpdateStatus(Status: TStatus; ResponseCode: Integer; Msg: String);
+    procedure UpdateStatus(Status: TStatus; ResponseCode: Integer; Msg: String; Body: String);
   private
     LazSimpleHTTPsGet: TLazSimpleHTTPsGet;
   public
@@ -78,9 +80,12 @@ var
   Filename: String;
 begin
   try
-    if not Assigned(LazSimpleHTTPsGet) then
+    if Length(URLEdit.Text) > 0 then
     begin
-      LazSimpleHTTPsGet := TLazSimpleHTTPsGet.Create();
+      if not Assigned(LazSimpleHTTPsGet) then
+      begin
+        LazSimpleHTTPsGet := TLazSimpleHTTPsGet.Create();
+      end;
 
       Filename := LazSimpleHTTPsGet.GetFileNameFromURL(URLEdit.Text);
       SaveDialog.FileName := Filename;
@@ -90,14 +95,20 @@ begin
         LazSimpleHTTPsGet.Filename := SaveDialog.FileName;
         LazSimpleHTTPsGet.OnProgress := @UpdateProgress;
         LazSimpleHTTPsGet.onStatus := @UpdateStatus;
-        LazSimpleHTTPsGet.Start;
-        DownloadBtn.Enabled := False;
-        StopBtn.Enabled := True;
+        if LazSimpleHTTPsGet.Get then
+        begin
+          DownloadBtn.Enabled := False;
+          StopBtn.Enabled := True;
+        end
+        else
+        begin
+          ShowMessage('Download already running');
+        end;
       end;
     end
     else
     begin
-      ShowMessage('Download already running');
+      ShowMessage('Please enter a url');
     end;
   except
     on E: Exception do
@@ -112,7 +123,6 @@ procedure TMainForm.StopBtnClick(Sender: TObject);
 begin
   if Assigned(LazSimpleHTTPsGet) then
   begin
-    LazSimpleHTTPsGet.Stop;
     StatusInfoMemo.Append('Download stopped');
     FreeAndNil(LazSimpleHTTPsGet);
     DownloadBtn.Enabled := True;
@@ -122,12 +132,46 @@ begin
   end;
 end;
 
+procedure TMainForm.FetchBtnClick(Sender: TObject);
+begin
+  try
+    if Length(URLEdit.Text) > 0 then
+    begin
+      if not Assigned(LazSimpleHTTPsGet) then
+      begin
+        LazSimpleHTTPsGet := TLazSimpleHTTPsGet.Create();
+      end;
+
+      LazSimpleHTTPsGet.URL := URLEdit.Text;
+      LazSimpleHTTPsGet.OnProgress := @UpdateProgress;
+      LazSimpleHTTPsGet.onStatus := @UpdateStatus;
+      if LazSimpleHTTPsGet.Fetch then
+      begin
+        DownloadBtn.Enabled := False;
+        StopBtn.Enabled := True;
+      end
+      else
+      begin
+        ShowMessage('Download already running');
+      end;
+    end
+    else
+    begin
+      ShowMessage('Please enter a url');
+    end;
+  except
+    on E: Exception do
+    begin
+      ShowMessage(E.Message);
+    end;
+  end;
+end;
+
 // Form closed, stop downloads and free and nil LazSimpleHTTPsGet:
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   if Assigned(LazSimpleHTTPsGet) then
   begin
-    LazSimpleHTTPsGet.Stop;
     FreeAndNil(LazSimpleHTTPsGet);
   end;
 end;
@@ -146,7 +190,7 @@ begin
 end;
 
 // Status event (download start, done, error):
-procedure TMainForm.UpdateStatus(Status: TStatus; ResponseCode: Integer; Msg: String);
+procedure TMainForm.UpdateStatus(Status: TStatus; ResponseCode: Integer; Msg: String; Body: String);
 begin
   if Status = TStatus.sStart then
   begin
@@ -155,6 +199,14 @@ begin
   else if Status = TStatus.sDone then
   begin
     StatusInfoMemo.Append('Download done -> (HTTP Status: ' + IntToStr(ResponseCode) + '/' + Msg + ')');
+    if Length(Body) > 0 then
+    begin
+      StatusInfoMemo.Append('-- Body Start ------------------');
+      StatusInfoMemo.Append(Body);
+      StatusInfoMemo.Append('-- Body End --------------------');
+    end;
+    DownloadBtn.Enabled := True;
+    StopBtn.Enabled := False;
     DownloadProgressLabel.Caption := '-/-';
     ProgressBar.Position := 0;
   end

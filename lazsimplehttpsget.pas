@@ -41,7 +41,7 @@ unit LazSimpleHTTPsGet;
 interface
 
 uses
-  Classes, SysUtils, TypInfo,
+  Classes, SysUtils, TypInfo, Dialogs,
   {$IFDEF SIMPLEGETSYNAPSE}
   ssl_openssl3, httpsend, blcksock
   {$ELSE}
@@ -49,12 +49,15 @@ uses
   {$ENDIF}
   ;
 
+const
+  VERSION = '1.0.1';
+
 type
   TStatus = (sNone, sStart, sDone, sError);
 
   TProgressEvent = procedure(ALen, APos: Int64; AHRLen, AHRPos: String) of object;
 
-  TStatusEvent = procedure(Status: TStatus; ResponseCode: Integer; Msg: String) of object;
+  TStatusEvent = procedure(Status: TStatus; ResponseCode: Integer; Msg, Body: String) of object;
 
   TLazSimpleHTTPsGet = class;
 
@@ -72,15 +75,16 @@ type
       FStatus: TStatus;
       FResponseCode: Integer;
       FMsg: String;
+      FBody: String;
       {$IFDEF SIMPLEGETSYNAPSE}
       procedure DataReceived(Sender: TObject; Reason: THookSocketReason; const Value: String);
       function GetSizeFromHeader(Header: String): Int64;
       {$ELSE}
       procedure DataReceived(Sender: TObject; Const ContentLength, CurrentPos : Int64);
       {$ENDIF}
-      procedure SetStatus(Status: TStatus; ResponseCode: Integer = 0; Msg: string = '');
-      procedure HandleHTTPStatusCode(HTTPStatusCode: Integer);
-      function FormatByteSize(const bytes: int64): string;
+      procedure SetStatus(Status: TStatus; ResponseCode: Integer = 0; Msg: String = ''; Body: String = '');
+      procedure HandleHTTPStatusCode(HTTPStatusCode: Integer; Body: String = '');
+      function FormatByteSize(const bytes: int64): String;
     public
       URL: String;
       Filename: String;
@@ -107,8 +111,10 @@ type
       property Filename: String
         read FFilename
         write FFilename;
-      procedure Start;
-      procedure Stop;
+      function Get: Boolean;
+      function Fetch: Boolean;
+      destructor Destroy; override;
+      procedure ThreadTerminated(Sender: TObject);
       function GetFileNameFromURL(UrlString: String): String;
     published
       property OnProgress: TProgressEvent
@@ -124,29 +130,64 @@ implementation
 { TLazSimpleHTTPsGet }
 
 // Start the download process and manages thread handling:
-procedure TLazSimpleHTTPsGet.Start;
+function TLazSimpleHTTPsGet.Get: Boolean;
 begin
-  LazSimpleHTTPsGetThread := TLazSimpleHTTPsGetThread.Create(True);
-  LazSimpleHTTPsGetThread.FreeOnTerminate := False;
-  LazSimpleHTTPsGetThread.Owner := Self;
-  LazSimpleHTTPsGetThread.URL := FURL;
-  LazSimpleHTTPsGetThread.Filename := FFilename;
-  LazSimpleHTTPsGetThread.Start;
+  if not Assigned(LazSimpleHTTPsGetThread) then
+  begin
+    LazSimpleHTTPsGetThread := TLazSimpleHTTPsGetThread.Create(True);
+    LazSimpleHTTPsGetThread.OnTerminate := @ThreadTerminated;
+    LazSimpleHTTPsGetThread.FreeOnTerminate := True;
+    LazSimpleHTTPsGetThread.Owner := Self;
+    LazSimpleHTTPsGetThread.URL := FURL;
+    LazSimpleHTTPsGetThread.Filename := FFilename;
+    LazSimpleHTTPsGetThread.Start;
+
+    Result := True;
+  end
+  else
+  begin
+    Result := False;
+  end;
 end;
 
-// Stops the download process and manages thread handling:
-procedure TLazSimpleHTTPsGet.Stop;
+// Fetch a url and manages thread handling:
+function TLazSimpleHTTPsGet.Fetch: Boolean;
+begin
+  if not Assigned(LazSimpleHTTPsGetThread) then
+  begin
+    LazSimpleHTTPsGetThread := TLazSimpleHTTPsGetThread.Create(True);
+    LazSimpleHTTPsGetThread.OnTerminate := @ThreadTerminated;
+    LazSimpleHTTPsGetThread.FreeOnTerminate := True;
+    LazSimpleHTTPsGetThread.Owner := Self;
+    LazSimpleHTTPsGetThread.URL := FURL;
+    LazSimpleHTTPsGetThread.Filename := '';
+    LazSimpleHTTPsGetThread.Start;
+
+    Result := True;
+  end
+  else
+  begin
+    Result := False;
+  end;
+end;
+
+// Destructor terminates the thread if needed:
+destructor TLazSimpleHTTPsGet.Destroy;
 begin
   // Check if Thread is still running:
   if Assigned(LazSimpleHTTPsGetThread) then
   begin
-    if not LazSimpleHTTPsGetThread.Terminated then
-    begin
-      LazSimpleHTTPsGetThread.Terminate;
-      LazSimpleHTTPsGetThread.WaitFor;
-      FreeAndNil(LazSimpleHTTPsGetThread);
-    end;
+    LazSimpleHTTPsGetThread.Terminate;
+    LazSimpleHTTPsGetThread.WaitFor;
   end;
+
+  inherited;
+end;
+
+// Gets called after thread has been terminated:
+procedure TLazSimpleHTTPsGet.ThreadTerminated(Sender: TObject);
+begin
+  LazSimpleHTTPsGetThread := nil;
 end;
 
 // Extracts a file name from an given URL:
@@ -177,7 +218,7 @@ end;
 { TLazSimpleHTTPsGetThread }
 
 // Formats byte size in human readable values:
-function TLazSimpleHTTPsGetThread.FormatByteSize(const bytes: int64): string;
+function TLazSimpleHTTPsGetThread.FormatByteSize(const bytes: int64): String;
 const
   B = 1; //byte
   KB = 1024 * B; //kilobyte
@@ -290,11 +331,12 @@ begin
 end;
 
 // Set the status of the download and sync with main thread:
-procedure TLazSimpleHTTPsGetThread.SetStatus(Status: TStatus; ResponseCode: Integer = 0; Msg: string = '');
+procedure TLazSimpleHTTPsGetThread.SetStatus(Status: TStatus; ResponseCode: Integer = 0; Msg: String = ''; Body: String = '');
 begin
   FStatus := Status;
   FResponseCode := ResponseCode;
   FMsg := Msg;
+  FBody := Body;
   if not Terminated then
   begin
     Synchronize(@ShowStatus);
@@ -306,21 +348,21 @@ procedure TLazSimpleHTTPsGetThread.ShowStatus;
 begin
   if Assigned(Owner.FOnStatus) then
   begin
-    Owner.FOnStatus(FStatus, FResponseCode, FMsg);
+    Owner.FOnStatus(FStatus, FResponseCode, FMsg, FBody);
   end;
 end;
 
 // Generates the OnStatus response:
-procedure TLazSimpleHTTPsGetThread.HandleHTTPStatusCode(HTTPStatusCode: Integer);
+procedure TLazSimpleHTTPsGetThread.HandleHTTPStatusCode(HTTPStatusCode: Integer; Body: String = '');
 begin
   // Handle most important status codes:
   case HTTPStatusCode of
   100..229:
     begin
       if HTTPStatusCode = 200 then
-        SetStatus(sDone, 200, 'OK')
+        SetStatus(sDone, 200, 'OK', Body)
       else
-        SetStatus(sDone, HTTPStatusCode);
+        SetStatus(sDone, HTTPStatusCode, '', Body);
     end;
   301:
     SetStatus(sError, 301, 'Moved Permanently');
@@ -348,14 +390,16 @@ end;
 
 // Run the thread:
 procedure TLazSimpleHTTPsGetThread.Execute;
-{$IFNDEF SIMPLEGETSYNAPSE}
 var
+  Content: String;
+{$IFNDEF SIMPLEGETSYNAPSE}
   Headers: TStringList;
   ContentLength: String;
 {$ENDIF}
 begin
   FSize := -1;
   FStatus := sNone;
+  Content := '';
   {$IFDEF SIMPLEGETSYNAPSE}
   HTTPSender := THTTPSend.Create;
   {$ELSE}
@@ -368,7 +412,7 @@ begin
 
       {$IFDEF SIMPLEGETSYNAPSE}
       // Using Synapse:
-      HTTPSender.UserAgent := 'LazSimpleHTTPsGet/1.0';
+      HTTPSender.UserAgent := 'LazSimpleHTTPsGet/' + VERSION;
       // Set Callback:
       HTTPSender.Sock.OnStatus := @DataReceived;
       // Start download:
@@ -377,14 +421,17 @@ begin
       case HTTPSender.ResultCode of
       100..229:
         begin
-          HTTPSender.Document.SaveToFile(Filename);
+          if Length(Filename) > 0 then
+            HTTPSender.Document.SaveToFile(Filename)
+          else
+            SetString(Content, PAnsiChar(HTTPSender.Document.Memory), HTTPSender.Document.Size);
         end;
       end;
       // Generate response for OnStatus Event:
-      HandleHTTPStatusCode(HTTPSender.ResultCode);
+      HandleHTTPStatusCode(HTTPSender.ResultCode, Content);
       {$ELSE}
       // Using FCL:
-      HTTPSender.AddHeader('User-Agent', 'LazSimpleHTTPsGet/1.0');
+      HTTPSender.AddHeader('User-Agent', 'LazSimpleHTTPsGet/' + VERSION);
       HTTPSender.AllowRedirect := True;
 
       // Getting file size via HEAD request:
@@ -401,10 +448,13 @@ begin
       HTTPSender.OnDataReceived := @DataReceived;
 
       // Start download:
-      HTTPSender.Get(URL, Filename);
+      if Length(Filename) > 0 then
+        HTTPSender.Get(URL, Filename)
+      else
+        Content := HTTPSender.Get(URL);
 
       // Generate response for OnStatus Event:
-      HandleHTTPStatusCode(HTTPSender.ResponseStatusCode);
+      HandleHTTPStatusCode(HTTPSender.ResponseStatusCode, Content);
       {$ENDIF}
     except
       on E: Exception do

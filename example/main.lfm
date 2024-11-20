@@ -1,20 +1,20 @@
 object MainForm: TMainForm
   Left = 350
-  Height = 269
+  Height = 348
   Top = 250
   Width = 517
   BorderStyle = bsSingle
   Caption = 'LazSimpleHTTPsGet'
-  ClientHeight = 269
+  ClientHeight = 348
   ClientWidth = 517
   OnDestroy = FormDestroy
   object GroupBox1: TGroupBox
     Left = 8
-    Height = 256
+    Height = 336
     Top = 8
     Width = 504
     Caption = 'Download File Example'
-    ClientHeight = 236
+    ClientHeight = 316
     ClientWidth = 500
     TabOrder = 0
     object DownloadProgressLabel: TLabel
@@ -33,7 +33,7 @@ object MainForm: TMainForm
     end
     object StatusInfoMemo: TMemo
       Left = 112
-      Height = 64
+      Height = 152
       Top = 112
       Width = 374
       ReadOnly = True
@@ -43,9 +43,9 @@ object MainForm: TMainForm
     object DownloadBtn: TButton
       Left = 112
       Height = 33
-      Top = 192
-      Width = 184
-      Caption = 'Start Download'
+      Top = 272
+      Width = 104
+      Caption = 'Download File'
       TabOrder = 2
       OnClick = DownloadBtnClick
     end
@@ -78,14 +78,22 @@ object MainForm: TMainForm
       Caption = 'Progress:'
     end
     object StopBtn: TButton
-      Left = 302
+      Left = 374
       Height = 33
-      Top = 192
-      Width = 184
+      Top = 272
+      Width = 112
       Caption = 'Stop Download'
-      Enabled = False
       TabOrder = 4
       OnClick = StopBtnClick
+    end
+    object FetchBtn: TButton
+      Left = 240
+      Height = 33
+      Top = 272
+      Width = 104
+      Caption = 'Fetch Content'
+      TabOrder = 5
+      OnClick = FetchBtnClick
     end
   end
   object SaveDialog: TSaveDialog
